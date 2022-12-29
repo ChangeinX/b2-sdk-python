@@ -59,7 +59,8 @@ class TestFileVersion:
         )
         assert expected_entry == file_version_info.format_ls_entry()
 
-    def test_upload_with_time_attribute(self):
+    @pytest.mark.apiver(from_ver=2, to_ver=3)
+    def test_upload_with_time_attribute_v2_v3(self):
         bucket = self.bucket
         sut = bucket.upload_bytes(
             b'test_file',
@@ -70,6 +71,51 @@ class TestFileVersion:
         result = self.api.get_file_info(sut.id_)
 
         assert result == sut
+
+    @pytest.mark.apiver(from_ver=0, to_ver=1)
+    def test_upload_with_time_attribute_v1(self):
+        """
+        In api ver 1, FileVersionInfo returns an object named FileVersionInfo and is not a tuple or a dict.
+        See below:
+        FileVersionInfo(
+        '9998', 'test_file', 9, 'b2/x-auto', '506438fbfc4a029ffee8b001fdce3c2cbd5541ec',
+        True, {'src_last_modified_millis': 1671500543.5804098}, 5001,
+        <EncryptionSetting(EncryptionMode.NONE, None, None)>, <LegalHold.UNSET: None>,
+        FileRetentionSetting(None, None), 1671500543, None, None, None, None,
+        'upload', <b2sdk.v1.api.B2Api object at 0x0000019990EEECD0>
+        )
+        """
+        bucket = self.bucket
+        v1_obj = lambda obj: {
+            att_name: getattr(obj, att_name)
+            for att_name in [
+                'id_',
+                'file_name',
+                'size',
+                'content_type',
+                'content_sha1',
+                'file_info',
+                'upload_timestamp',
+                'action',
+                'content_md5',
+                'server_side_encryption',
+                'legal_hold',
+                'file_retention',
+                'api',
+            ]
+        }
+        sut = bucket.upload_bytes(
+            b'test_file',
+            'test_file',
+            file_infos={'src_last_modified_millis': 1671500543.5804098}
+        )
+
+        result = self.api.get_file_info(sut.id_)
+        print("result: ", result)
+        print("sut: ", sut)
+
+        assert result == v1_obj(sut)
+
 
     def test_get_fresh_state(self):
         self.api.update_file_legal_hold(
